@@ -31,4 +31,6 @@ douban320k
 
 PS：
 	1.目前使用了 msvcrt 应该只支持 windows
-	2.目前播放使用的是本地的 mpg123.exe 来进行播放
+	
+	2.目前播放使用的是本地的 mpg123.exe 来进行播放，详间douban320k第
+157行

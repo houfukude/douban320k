@@ -17,10 +17,12 @@ login_url = 'http://www.douban.com/j/app/login'
 channel_url = 'http://www.douban.com/j/app/radio/channels'
 playlist_url = 'http://www.douban.com/j/app/radio/people?&app_name=radio_desktop_win&version=100'
 search_url = 'http://music.163.com/api/search/get'
-f = 'config.ini'
-userinfo = None
+cfg = 'config.ini'
+
 reload(sys)
 sys.setdefaultencoding('utf-8')
+
+userinfo = None
 def add_userinfo(url):
 	global userinfo
 	if userinfo != None:
@@ -54,7 +56,7 @@ def post_data(url, data,cookie):
 
 def get_data(url):
 	return urllib.urlopen(url).read()
-	
+
 def login_douban(email,password):
 	if(email ==None) or (password == None):
 		return None
@@ -66,7 +68,6 @@ def login_douban(email,password):
 	}
 	return post_data(login_url,data,None).decode('utf-8')
 
-
 # 获取播放列表
 def get_play_list(channel='0',type='n',sid =None):
 	url = add_userinfo(playlist_url) +'&channel='+ channel+'&type='+type
@@ -74,16 +75,6 @@ def get_play_list(channel='0',type='n',sid =None):
 		url = url +'&sid='+sid
 	return get_data(url)
 
-def get_palyback_url(channel,sid,like):
-	url = add_userinfo(playlist_url)
-	if url == playlist_url:
-		return u'[INFO]:你还没登陆！'
-	if like == '1':
-		return u'[INFO]:Aready Rated this song'
-	if channel is '-3':
-		return u'[INFO]:正在播放红心歌单'
-	return url +'&channel='+ channel +'&sid='+sid
-	
 def search_song_by_name(title):
 	#set cookie
 	cookie = urllib2.build_opener()
@@ -101,6 +92,7 @@ def search_song_by_name(title):
 		return resp_json['result']
 	else:
 		return None
+
 def get_163_url_by_id(song_id):
 	if song_id == None:
 		return None
@@ -111,9 +103,6 @@ def get_163_url_by_id(song_id):
 	return 'http://m%d.music.126.net/%s/%s.mp3' % (random.randrange(1, 3), encrypted_id(song_dfsId), song_dfsId)
 
 def find_matched_url(result,artist,album):
-	#if mode == '0':
-	#	song_id = result['songs'][0]['id']
-	#else:
 	song_id = None
 	if result['songCount'] > 1:
 		for i in range(len(result['songs'])):
@@ -123,21 +112,27 @@ def find_matched_url(result,artist,album):
 			if (tmp_artists.lower() == artist.lower()):
 				song_id = result['songs'][i]['id']
 				if(tmp_album.lower() == album.lower()):
-					print '[*]',
-				print '[*]',
-				break
+					break
 	return get_163_url_by_id(song_id)
 
 def find_first_url(result,artist,album):
 	song_id = result['songs'][0]['id']
 	return get_163_url_by_id(song_id)
 
-def run_callback(callback_url,type):
+def get_palyback_url(channel,sid):
+	url = add_userinfo(playlist_url)
+	if url == playlist_url:
+		return u'[INFO]:你还没登陆！'
+	return url +'&channel='+ channel +'&sid='+sid
+
+def run_callback(callback_url,type,like):
+	if int(like) == 1 and type == 'r':
+		return u'[INFO]:已红心过了！'
 	if '[INFO]' not in callback_url:
 		callback_url = callback_url+'&type='+type
 		th = threading.Thread(target = get_data,args = (callback_url,))
 		th.start()
-		return 'Rated !'
+		return u'[INFO]:已红心！'
 	else:
 		return callback_url
 	
@@ -150,39 +145,53 @@ def kbfunc():
 		time.sleep(1)
 	return ret
 
-def play(msg,url,callback_url):
+def play(msg,url,callback_url,like):
 	os.system('cls')
-	print msg.encode('gbk')
-	os.system("title [*]nowplaying...")
+	try:
+		print msg.encode('gb18030')
+	except:
+		print 'msg print error'
+		fp = open('error'+time.strftime('%Y%m%d',time.localtime(time.time()))+'.log','wb')
+		fp.write(msg)
+		fp.close()
+	#os.system("title [*]nowplaying...")
 	playing = subprocess.Popen('mpg123 -qv '+url, shell = False)
 	while playing.poll() is None:
 		cmd = kbfunc()
 		type = None
-		if(cmd is 'r'):
+		
+		if(cmd is 'r')or (cmd is 'R'):
 			os.system('cls')
-			print msg.encode('gbk')
-			print run_callback(callback_url,'r')
-		if(cmd is 'b'):
+			try:
+				print msg.encode('gb18030')
+			except:
+				pass
+			print '\t',run_callback(callback_url,'r',like)
+		if(cmd is 'b') or (cmd is 'B'):
 			playing.kill()
-			run_callback(callback_url,'b')
-			os.system("title [*]find a new song...")
+			run_callback(callback_url,'b',like)
+			#os.system("title [*]find a new song...")
 			break
-		if(cmd is 'n'):
+		if(cmd is 'n')or (cmd is 'N'):
 			playing.kill()
-			run_callback(callback_url,'s')
-			os.system("title [*]find a new song...")
+			run_callback(callback_url,'s',like)
+			#os.system("title [*]find a new song...")
 			break
-		if(cmd is 'q'):
-			playing.kill()
-			run_callback(callback_url,'s')
-			print '\n\nBye Bye!'
-			sys.exit()
-		if(cmd is 'c'):
-			run_callback(callback_url,'s')
+		if(cmd is 'c')or (cmd is 'C'):
+			run_callback(callback_url,'b',like)
 			playing.kill()
 			os.system('cls')
 			start()
-	run_callback(callback_url,'e')
+		if(cmd is 'u')or (cmd is 'U'):
+			playing.kill()
+			run_callback(callback_url,'u',like)
+			break
+		if(cmd is 'q')or (cmd is 'Q'):
+			playing.kill()
+			run_callback(callback_url,'b',like)
+			print '\n\nBye Bye!'
+			sys.exit()
+	run_callback(callback_url,'e',like)
 	os.system('cls')
 	print u'\t正在载入下一曲...'
 
@@ -202,7 +211,7 @@ def play_channel(channel='0',type='n',mode ='0'):
 		if(album == u'豆瓣FM'):
 			return
 		if mode == '2':
-			msg  = u'[@] 64K '
+			msg  = u' [@] 64K '
 			url = douban_url
 		else:
 			result = search_song_by_name(title)
@@ -211,17 +220,18 @@ def play_channel(channel='0',type='n',mode ='0'):
 			url = find_matched_url(result,artist,album)	
 			if url == None:
 				if mode == '0':
-					msg  = u'[@] 64K '
+					msg  = u' [@] 64K '
 					url = douban_url
 				if mode == '1':
 					msg = u' [@] 320K '
 					url = find_first_url(result,artist,album)
 			else:
 				msg = u' [*] 320K '
-		msg = msg + u'[正在播放]:%s [艺术家]:%s [专辑]:%s\n' % (title, artist, album)
-		callback_url = get_palyback_url(channel,sid,like)
-		play(msg,url,callback_url)
+		msg = msg + u'[正在播放]:%s \n\t[艺术家]:%s [专辑]:%s' % (title.encode('utf-8'), artist.encode('utf-8'), album.encode('utf-8'))
+		callback_url = get_palyback_url(channel,sid)
+		play(msg,url,callback_url,like)
 		#print '[%2d]song:%s\tartist:%s\talbum:%s' % (i+1,tmp_title, tmp_artists, tmp_album)
+	os.system("cls")
 	print u'\t正在读取新播放列表...'
 
 def start():
@@ -229,9 +239,10 @@ def start():
 	channel = '0'
 	mode = '0'
 	msg = u'\n[ q ] \t系统退出\t\t'
+	os.system("title Douban320k player")
 	if len(sys.argv) < 3:
-		if os.path.isfile(f):
-			data = file(f).read().split(' ### ')
+		if os.path.isfile(cfg):
+			data = file(cfg).read().split(' ### ')
 			userinfo = data[0]
 			res = json.loads( userinfo)
 			msg = msg+ u'[-3]\t%s的红心收藏'% ( res['user_name'])
@@ -248,7 +259,7 @@ def start():
 		if res['r'] != 1:
 			msg = msg + u'[-3]\tchannel:%s的红心收藏'% ( res['user_name'])
 			data = userinfo +" ### "+mode
-			fp = open(f,'wb')
+			fp = open(cfg,'wb')
 			fp.write(data.encode('utf-8'))
 			fp.close()
 		else:
@@ -256,7 +267,6 @@ def start():
 	#
 	channels = json.loads(get_data(channel_url))
 	os.system("cls")
-	os.system("title Douban320k player")
 	print u'\t\t----------豆瓣FM频道列表------------'
 	for i in range(len(channels['channels'])):
 		id = int(channels['channels'][i]['channel_id'])
@@ -271,7 +281,7 @@ def start():
 			print '\t',
 	#
 	print msg
-	channel = raw_input('Select Channel:')
+	channel = raw_input(u'Select a Channel:')
 	try:
 		int(channel)
 	except:

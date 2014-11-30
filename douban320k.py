@@ -4,27 +4,48 @@ import os
 import sys
 import json
 import md5
-import base64
-import urllib2
-import urllib
 import json
-import random
-import subprocess
-import threading
-import msvcrt
 import time
+import urllib
+import urllib2
+import signal
+import select
+import base64
+import termios
+import random
+import threading
+import subprocess
 login_url = 'http://www.douban.com/j/app/login'
 channel_url = 'http://www.douban.com/j/app/radio/channels'
 playlist_url = 'http://www.douban.com/j/app/radio/people?&app_name=radio_desktop_win&version=100'
 search_url = 'http://music.163.com/api/search/get'
 cfg = 'config.ini'
+try:
+	import msvcrt
+	clear = 'cls'
+	isUnix = False
+except:
+	clear = 'clear'
+	isUnix = True
 #set cookie
 netsase_cookie = urllib2.build_opener()
 netsase_cookie.addheaders.append(('Cookie', 'appver=2.0.2'))
 netsase_cookie.addheaders.append(('Referer', 'http://music.163.com'))
 #code
+
+
 reload(sys)
 sys.setdefaultencoding('utf-8')
+
+#Unix keyboard
+fd = sys.stdin.fileno()
+old_settings = termios.tcgetattr(fd)
+new_settings = old_settings
+#new_settings[3] = new_settings[3] & ~termios.ISIG
+new_settings[3] = new_settings[3] & ~termios.ICANON
+new_settings[3] = new_settings[3] & ~termios.ECHONL
+#print 'old setting %s'%(repr(old_settings))
+termios.tcsetattr(fd,termios.TCSAFLUSH,new_settings)
 
 userinfo = None
 def add_userinfo(url):
@@ -127,32 +148,50 @@ def get_palyback_url(channel,sid):
 		return u'\t[INFO]:你还没登陆！'
 	return url +'&channel='+ channel +'&sid='+sid
 
-def run_callback(callback_url,type,like = '-1'):
-	if int(like) == 1 and type == 'r':
+def run_callback(callback_url,t,like = '-1'):
+	if int(like) == 1 and t == 'r':
 		return u'\t[INFO]:已红心过了！'
-	if int(like) == 0 and type == 'u':
+	if int(like) == 0 and t == 'u':
 		return u'\t[INFO]:未曾红心过！'
 	if '[INFO]' not in callback_url:
-		callback_url = callback_url+'&type='+type
+		callback_url = callback_url+'&type='+t
 		th = threading.Thread(target = get_data,args = (callback_url,))
 		th.start()
 		return {-1:u'\t[INFO]:已完成服务器反馈！',0:u'\t[INFO]:已红心标记！',1:u'\t[INFO]:已取消红心！',}[int(like)]
 	else:
 		return callback_url
-	
+
+
 def keyboard_func(): 
 	ret = -1
-	x = msvcrt.kbhit()
-	if x: 
-		ret = ord(msvcrt.getch())
+	if isUnix:
+		fd = sys.stdin.fileno()
+		r = select.select([sys.stdin],[],[],0.01)
+		if len(r[0]) >0:
+			ret  =ord(sys.stdin.read(1))
+		else:
+			time.sleep(1)
 	else:
-		time.sleep(1)
+		x = msvcrt.kbhit()
+		if x:
+			ret = ord(msvcrt.getch()) 
+		else:
+			time.sleep(1)
 	return ret
 
+def getChar(): 
+	if isUnix :
+		return  ord(sys.stdin.read(1))
+	else:
+		return ord(msvcrt.getch())
+
+
 def play(msg,url,callback_url,like):
-	os.system('cls')
+	if not isUnix:
+		msg = msg.encode('gb18030')
+	os.system(clear)
 	try:
-		print msg.encode('gb18030')
+		print msg
 	except:
 		errorfile = 'error'+time.strftime('%Y%m%d',time.localtime(time.time()))+'.log'
 		print 'msg print error at',errorfile
@@ -161,64 +200,83 @@ def play(msg,url,callback_url,like):
 		fp.close()
 	print {1:u'\t[INFO]:已红心！',0:u'\t[INFO]:未红心！',}[int(like)]
 	#os.system("title [*]nowplaying...")
-	playing = subprocess.Popen('mpg123 -qv '+url,stdin = subprocess.PIPE, shell = False)
-	type = 'e'
-	like_status = like
+	#if isUnix:
+	#	cmds = "mplayer  -q " + url
+	#else:
+	cmds =  "mpg123 -qv '"+url+"'"
+	#print cmds
+	playing = subprocess.Popen(cmds, shell = True, preexec_fn=os.setsid)
+	t = 'e'
 	while playing.poll() is None:
 		key = keyboard_func()
-		if(key == 32):
-			#TODO pause playing
-			#playing.stdin.write(' ')
-			pass
-		if (key == 224):#NoneABC
-			key = ord(msvcrt.getch())
-			if (key == 77): #Right arrow
-				playing.kill()
-				type = 's'
-				break
-			if (key == 72): #Up arrow
-				os.system('cls')
-				print msg.encode('gb18030')
-				print run_callback(callback_url,'r',like_status)
-				like_status = 1
-			if (key == 80): #Down arrow
-				os.system('cls')
-				print msg.encode('gb18030')
-				print run_callback(callback_url,'u',like_status)
-				like_status = 0
-			if (key == 75): #Left arrow
-				playing.kill()
-				os.system('cls')
-				start()
+		if key > 0 :
+			os.system(clear)
 		if(key == 82) or (key == 114):#R r
-			os.system('cls')
-			print msg.encode('gb18030')
-			print run_callback(callback_url,'r',like_status)
-			like_status = 1
+			print msg
+			print run_callback(callback_url,'r',like)
+			like = 1
+		if(key == 85) or (key == 117):#U u
+			print msg
+			print run_callback(callback_url,'u',like)
+			like = 0
 		if(key == 66) or (key == 98):#B b
-			playing.kill()
-			type = 'b'
+			os.killpg(playing.pid, signal.SIGTERM)
+			t = 'b'
 			break
 		if(key == 78) or (key == 110):#N n
-			playing.kill()
-			type = 's'
+			os.killpg(playing.pid, signal.SIGTERM)
+			t = 's'
 			break
 		if(key == 67) or (key == 99):#C c
-			playing.kill()
-			os.system('cls')
+			os.killpg(playing.pid, signal.SIGTERM)
 			start()
-		if(key == 85) or (key == 117):#U u
-			os.system('cls')
-			print msg.encode('gb18030')
-			print run_callback(callback_url,'u',like_status)
-			like_status = 0
-		if(key == 81) or (key == 113) or (key == 27):#Q q Esc
-			playing.kill()
+		if(key == 81) or (key == 113):#Q q 
+			os.killpg(playing.pid, signal.SIGTERM)
 			print '\n\nBye Bye!'
-			type = 'b'
 			sys.exit()
-	os.system('cls')
-	print run_callback(callback_url,type)
+		if (key == 224):#NoneABC
+			key = getChar()
+			if (key == 77): #Right arrow
+				os.killpg(playing.pid, signal.SIGTERM)
+				t = 's'
+				break
+			if (key == 72): #Up arrow
+				print msg
+				print run_callback(callback_url,'r',like)
+				like = 1
+			if (key == 80): #Down arrow
+				print msg
+				print run_callback(callback_url,'u',like)
+				like = 0
+			if (key == 75): #Left arrow
+				os.killpg(playing.pid, signal.SIGTERM)
+				start()
+		if key == 27: #Esc
+			if isUnix:
+				key = getChar()
+				if key == 91:#UNIX  second key
+					key = getChar()
+					if key == 65: #up
+						print msg
+						print run_callback(callback_url,'r',like)
+						like = 1
+					if key == 66: #down
+						print msg
+						print run_callback(callback_url,'u',like)
+						like = 0
+					if key == 67: #right
+						os.killpg(playing.pid, signal.SIGTERM)
+						t = 's'
+						break
+					if key == 68: #left
+						os.killpg(playing.pid, signal.SIGTERM)
+						start()
+			else:
+				os.killpg(playing.pid, signal.SIGTERM)
+				print '\n\nBye Bye!'
+				sys.exit()
+	os.system(clear)		
+	print run_callback(callback_url,t)
 	print u'\t正在载入下一曲...'
 
 # 播放douban.fm
@@ -258,7 +316,7 @@ def play_channel(channel='0',type='n',mode ='0'):
 		callback_url = get_palyback_url(channel,sid)
 		play(msg,url,callback_url,like)
 		#print '[%2d]song:%s\tartist:%s\talbum:%s' % (i+1,tmp_title, tmp_artists, tmp_album)
-	os.system("cls")
+	os.system(clear)
 	print u'\t正在读取新播放列表...'
 
 def start():
@@ -266,7 +324,7 @@ def start():
 	channel = '0'
 	mode = '0'
 	msg = u'[ q ] \t系统退出\t\t[-3]\t%s的红心收藏'
-	os.system("title Douban320k player")
+	#os.system("title Douban320k player")
 	if len(sys.argv) < 3:
 		if os.path.isfile(cfg):
 			data = file(cfg).read().split(' ### ')
@@ -283,6 +341,7 @@ def start():
 			pass
 		userinfo = login_douban(email,password)
 		res = json.loads( userinfo)
+		print res
 		if res['r'] != 1:
 			msg = msg % ( res['user_name'])
 			data = userinfo +" ### "+mode
@@ -293,7 +352,7 @@ def start():
 			userinfo = None
 	#
 	channels = json.loads(get_data(channel_url))
-	os.system("cls")
+	os.system(clear)
 	print u'\t\t----------豆瓣FM频道列表------------'
 	for i in range(len(channels['channels'])):
 		id = int(channels['channels'][i]['channel_id'])
@@ -316,17 +375,17 @@ def start():
 	except:
 		print '\nBYE BYE!'
 		sys.exit(0)
-	os.system("cls")
+	os.system(clear)
 	#播放开始
 	#type = 'n'
 	while True:
 		play_channel(channel=channel,mode =mode)
-
 	
 if __name__ == '__main__':
 	try:
+		os.system(clear)
 		start()
 	except KeyboardInterrupt:
-		os.system("cls")
+		os.system(clear)
 		print '\nBYE!'
 		sys.exit(0)

@@ -132,8 +132,8 @@ def find_matched_url(result,artist,album):
             tmp_album = result['songs'][i]['album']['name']
             #print '[%2d]song:%s\tartist:%s\talbum:%s' % (i+1,tmp_song['name'], tmp_artists, tmp_album)
             if (tmp_artists.lower() == artist.lower()):
-                song_id = result['songs'][i]['id']
-                if(tmp_album.lower() == album.lower()):
+                if(tmp_album.lower().find(album.lower()) or album.lower().find(tmp_album.lower()) ):
+                    song_id = result['songs'][i]['id']
                     break
     return get_163_url_by_id(song_id)
 
@@ -262,35 +262,34 @@ def play(msg,url,callback_url,like):
 def play_channel(channel='0',type='n',mode ='0'):
     playlist = json.loads(get_play_list(channel,type))
     for i in range(len(playlist['song'])):
-        msg = None
-        url = None
-        title = playlist['song'][i]['title']
-        artist = playlist['song'][i]['artist']
         album = playlist['song'][i]['albumtitle']
-        douban_url = playlist['song'][i]['url']
+        if(album == u'豆瓣FM'):
+            return
         sid = playlist['song'][i]['sid']
         like = playlist['song'][i]['like']
+        title = playlist['song'][i]['title']
+        artist = playlist['song'][i]['artist']
+        douban_url = playlist['song'][i]['url']
         #kbps = playlist['song'][i]['kbps']
         #print '[%2d]song:%s\tartist:%s\talbum:%s' % (i+1,title, artist, album)
         if(album == u'豆瓣FM'):
             return
-        if mode == '2':
-            msg  = u'\t[@] 64K '
+                if int(mode)  is 2:
+            msg = u'\t[@] 64K '
             url = douban_url
         else:
             result = search_song_by_name(title)
-            if result == None:
+            if result is None:
                 return
-            url = find_matched_url(result,artist,album)    
-            if url == None:
-                if mode == '0':
-                    msg  = u'\t[@] 64K '
+            url = find_matched_url(result,artist,album) 
+            msg = u'\t[*] 320K '
+            if url is None:
+                if int(mode) is 0:
+                    msg = u'\t[@] 64K '
                     url = douban_url
-                if mode == '1':
+                else:
                     msg = u'\t[@] 320K '
                     url = find_first_url(result,artist,album)
-            else:
-                msg = u'\t[*] 320K '
         msg = msg + u'[正在播放]:%s \n\t[艺术家]:%s [专辑]:%s' % (title.encode('utf-8'), artist.encode('utf-8'), album.encode('utf-8'))
         callback_url = get_palyback_url(channel,sid)
         play(msg,url,callback_url,like)

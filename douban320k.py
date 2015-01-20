@@ -189,7 +189,8 @@ def kill(p):
     else:
         p.kill()
 
-def play(msg,url,callback_url,like):
+def play(msg,url,channel,sid,like):
+    callback_url = get_palyback_url(channel,sid)
     cmds =  "mpg123 -qv "+url
     os.system(clear)
     if isUnix:
@@ -250,6 +251,10 @@ def play(msg,url,callback_url,like):
             if key.lower() == 'c':
                 kill(playing)
                 start()
+            if key.lower() == 's':
+                kill(playing)
+                play_channel(channel=sid)
+                break
             if key.lower() == 'q':
                 kill(playing)
                 print '\n\nBye Bye!'
@@ -259,46 +264,47 @@ def play(msg,url,callback_url,like):
     print u'\t[INFO]:正在载入下一曲...'
 
 # 播放douban.fm
-def play_channel(channel='0',type='n',mode ='0'):
-    playlist = json.loads(get_play_list(channel,type))
-    for i in range(len(playlist['song'])):
-        album = playlist['song'][i]['albumtitle']
-        if(album == u'豆瓣FM'):
-            return
-        sid = playlist['song'][i]['sid']
-        like = playlist['song'][i]['like']
-        title = playlist['song'][i]['title']
-        artist = playlist['song'][i]['artist']
-        douban_url = playlist['song'][i]['url']
-        #kbps = playlist['song'][i]['kbps']
-        #print '[%2d]song:%s\tartist:%s\talbum:%s' % (i+1,title, artist, album)
-        if(album == u'豆瓣FM'):
-            return
-                if int(mode)  is 2:
-            msg = u'\t[@] 64K '
-            url = douban_url
-        else:
-            result = search_song_by_name(title)
-            if result is None:
+def play_channel(channel='0',type='n'):
+    while True:
+        playlist = json.loads(get_play_list(channel,type))['song']
+        for i in range(len(playlist)):
+            album = playlist[i]['albumtitle']
+            if(album == u'豆瓣FM'):
                 return
-            url = find_matched_url(result,artist,album) 
-            msg = u'\t[*] 320K '
-            if url is None:
-                if int(mode) is 0:
-                    msg = u'\t[@] 64K '
-                    url = douban_url
-                else:
-                    msg = u'\t[@] 320K '
-                    url = find_first_url(result,artist,album)
-        msg = msg + u'[正在播放]:%s \n\t[艺术家]:%s [专辑]:%s' % (title.encode('utf-8'), artist.encode('utf-8'), album.encode('utf-8'))
-        callback_url = get_palyback_url(channel,sid)
-        play(msg,url,callback_url,like)
-        #print '[%2d]song:%s\tartist:%s\talbum:%s' % (i+1,tmp_title, tmp_artists, tmp_album)
-    os.system(clear)
-    print u'\t正在读取新播放列表...'
+            sid = playlist[i]['sid']
+            like = playlist[i]['like']
+            title = playlist[i]['title']
+            artist = playlist[i]['artist']
+            douban_url = playlist[i]['url']
+            #kbps = playlist[i]['kbps']
+            #print '[%2d]song:%s\tartist:%s\talbum:%s' % (i+1,title, artist, album)
+            if(album == u'豆瓣FM'):
+                return
+            if int(mode)  is 2:
+                msg = u'\t[@] 64K '
+                url = douban_url
+            else:
+                result = search_song_by_name(title)
+                if result is None:
+                    return
+                url = find_matched_url(result,artist,album) 
+                msg = u'\t[*] 320K '
+                if url is None:
+                    if int(mode) is 0:
+                        msg = u'\t[@] 64K '
+                        url = douban_url
+                    else:
+                        msg = u'\t[@] 320K '
+                        url = find_first_url(result,artist,album)
+            msg = msg + u'[正在播放]:%s \n\t[艺术家]:%s [专辑]:%s' % (title.encode('utf-8'), artist.encode('utf-8'), album.encode('utf-8'))
+            play(msg,url,channel,sid,like)
+            #print '[%2d]song:%s\tartist:%s\talbum:%s' % (i+1,tmp_title, tmp_artists, tmp_album)
+        os.system(clear)
+        print u'\t正在读取新播放列表...'
 
 def start():
     global userinfo
+    global mode
     channel = '0'
     mode = '0'
     msg = u'[ q ] \t系统退出\t\t[-3]\t%s的红心收藏'
@@ -328,24 +334,23 @@ def start():
             fp.close()
         else:
             userinfo = None
-    #
-    channels = json.loads(get_data(channel_url))
+    #show all channels
+    channels = json.loads(get_data(channel_url))['channels']
     os.system(clear)
     print u'\t\t----------豆瓣FM频道列表------------'
-    for i in range(len(channels['channels'])):
-        id = int(channels['channels'][i]['channel_id'])
-        name = channels['channels'][i]['name']
+    for i in range(len(channels)):
+        id = int(channels[i]['channel_id'])
+        name = channels[i]['name']
+        if not isUnix:
+            name = name.encode('gb18030')
         if(i%2 == 0):
             print '[%2d]\tchannel:%s' % (id,name),
-            if(len(name)<=3):
+            if(len(name)<8):
                 print '\t',
-            if (i == range(len(channels['channels']))):
-                print ''
         else:
             print '\t[%2d]\tchannel:%s' % (id,name)
-        if(id ==16) or (id == 77):
-            print '\t',
-    #
+        if (i+1 == len(channels)):
+            print ''
     print msg
     channel = raw_input(u'Select a Channel:')
     try:
@@ -356,9 +361,7 @@ def start():
     os.system(clear)
     #播放开始
     #type = 'n'
-    while True:
-        play_channel(channel=channel,mode =mode)
-    
+    play_channel(channel = channel)
 if __name__ == '__main__':
     try:
         os.system(clear)

@@ -274,7 +274,7 @@ def play_channel(channel='0',type='n',mode ='0'):
         #print '[%2d]song:%s\tartist:%s\talbum:%s' % (i+1,title, artist, album)
         if(album == u'豆瓣FM'):
             return
-                if int(mode)  is 2:
+        if int(mode)  is 2:
             msg = u'\t[@] 64K '
             url = douban_url
         else:
@@ -335,16 +335,16 @@ def start():
     for i in range(len(channels['channels'])):
         id = int(channels['channels'][i]['channel_id'])
         name = channels['channels'][i]['name']
+        if not isUnix:
+            name = name.encode('gb18030')
         if(i%2 == 0):
             print '[%2d]\tchannel:%s' % (id,name),
-            if(len(name)<=3):
+            if(len(name)<8):
                 print '\t',
-            if (i == range(len(channels['channels']))):
+            if (i+1 == len(channels['channels'])):
                 print ''
         else:
             print '\t[%2d]\tchannel:%s' % (id,name)
-        if(id ==16) or (id == 77):
-            print '\t',
     #
     print msg
     channel = raw_input(u'Select a Channel:')

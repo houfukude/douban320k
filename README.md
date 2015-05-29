@@ -9,14 +9,18 @@ douban320k
 
 当前目录命令行
 
->douban320k.py 用户名 密码 mode
+>douban320k.py 豆瓣用户名 密码 mode
 
 或者直接下载win版的zip解压后双击运行
 
 >douban320k.exe
 
-![截图1]()
-![截图2]()
+如果win版需要登陆可以在退出情况下双击Login.bat
+
+输入 *豆瓣用户名 密码* mode
+
+![截图1](https://raw.githubusercontent.com/houfukude/douban320k/master/screenshot/douban320K_1.PNG)
+![截图2](https://raw.githubusercontent.com/houfukude/douban320k/master/screenshot/douban320K_2.PNG)
 
 [mode:0|1|2]
     

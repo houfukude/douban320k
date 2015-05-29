@@ -45,7 +45,13 @@ douban320k
 
 <del>1.目前使用了 msvcrt 应该只支持 windows</del>
     
-2.目前播放使用的是本地的 mpg123.exe 来进行播放，详间douban320k第157行
+2.目前播放使用的是本地的 mpg123 来进行播放，详情[#L195](https://github.com/houfukude/douban320k/blob/master/douban320k.py#L195)
+
+###Bug
+
+1.已知mpg在linux对wma支持不友好，建议linux的同学不使用流畅模式
+
+2.部分歌曲标题带有奇怪的字符（就是你脸滚键盘的！！）导致win下容易编码错误
 
 ####update： 
 
